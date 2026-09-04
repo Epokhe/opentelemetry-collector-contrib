@@ -1309,6 +1309,50 @@ func TestScrapeMetrics_DontCheckDisabledMetrics(t *testing.T) {
 	})
 }
 
+func TestScrapeMetrics_CommandReaderOnlyRunsForEnabledCommandAttributes(t *testing.T) {
+	skipTestOnUnsupportedOS(t)
+
+	for _, test := range []struct {
+		name        string
+		command     bool
+		commandLine bool
+		wantCalls   int
+	}{
+		{name: "both command attributes disabled", wantCalls: 0},
+		{name: "command enabled", command: true, wantCalls: 1},
+		{name: "command line enabled", commandLine: true, wantCalls: 1},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			metricsBuilderConfig := metadata.NewDefaultMetricsBuilderConfig()
+			metricsBuilderConfig.ResourceAttributes.ProcessCommand.Enabled = test.command
+			metricsBuilderConfig.ResourceAttributes.ProcessCommandLine.Enabled = test.commandLine
+
+			scraper, err := newProcessScraper(scrapertest.NewNopSettings(metadata.Type), &Config{MetricsBuilderConfig: metricsBuilderConfig})
+			require.NoError(t, err)
+			require.NoError(t, scraper.start(t.Context(), componenttest.NewNopHost()))
+
+			handleMock := &processHandleMock{}
+			handleMock.On("NameWithContext", mock.Anything).Return("test", nil)
+			handleMock.On("ExeWithContext", mock.Anything).Return("test", nil)
+			handleMock.On("CreateTimeWithContext", mock.Anything).Return(time.Now().UnixMilli(), nil)
+			initDefaultsHandleMock(t, handleMock)
+			scraper.getProcessHandles = func(context.Context) (processHandles, error) {
+				return &processHandlesMock{handles: []*processHandleMock{handleMock}}, nil
+			}
+
+			calls := 0
+			scraper.getProcessCommand = func(context.Context, processHandle) (*commandMetadata, error) {
+				calls++
+				return &commandMetadata{command: "command", commandLine: "command --flag"}, nil
+			}
+
+			_, err = scraper.scrape(t.Context())
+			require.NoError(t, err)
+			assert.Equal(t, test.wantCalls, calls)
+		})
+	}
+}
+
 func TestScrapeMetrics_CpuUtilizationWhenCpuTimesIsDisabled(t *testing.T) {
 	skipTestOnUnsupportedOS(t)
 

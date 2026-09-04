@@ -56,6 +56,7 @@ type processScraper struct {
 	// for mocking
 	getProcessCreateTime func(p processHandle, ctx context.Context) (int64, error)
 	getProcessHandles    func(context.Context) (processHandles, error)
+	getProcessCommand    func(context.Context, processHandle) (*commandMetadata, error)
 }
 
 // newProcessScraper creates a Process Scraper
@@ -65,6 +66,7 @@ func newProcessScraper(settings scraper.Settings, cfg *Config) (*processScraper,
 		config:               cfg,
 		getProcessCreateTime: processHandle.CreateTimeWithContext,
 		getProcessHandles:    getGopsutilProcessHandles,
+		getProcessCommand:    getProcessCommand,
 		scrapeProcessDelay:   cfg.ScrapeProcessDelay,
 		ucals:                make(map[int32]*ucal.CPUUtilizationCalculator),
 	}
@@ -241,9 +243,13 @@ func (s *processScraper) getProcessMetadata(ctx context.Context) ([]*processMeta
 			continue
 		}
 
-		command, err := getProcessCommand(ctx, handle)
-		if err != nil {
-			errs.AddPartial(0, fmt.Errorf("error reading command for process %q (pid %v): %w", executable.name, pid, err))
+		var command *commandMetadata
+		if s.config.MetricsBuilderConfig.ResourceAttributes.ProcessCommand.Enabled ||
+			s.config.MetricsBuilderConfig.ResourceAttributes.ProcessCommandLine.Enabled {
+			command, err = s.getProcessCommand(ctx, handle)
+			if err != nil {
+				errs.AddPartial(0, fmt.Errorf("error reading command for process %q (pid %v): %w", executable.name, pid, err))
+			}
 		}
 
 		username, err := handle.UsernameWithContext(ctx)
