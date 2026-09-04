@@ -43,6 +43,14 @@ metrics:
       aggregation_temporality: cumulative
       monotonic: false
 
+  system.memory.darwin.pressure:
+    enabled: false
+    description: macOS kernel memory pressure level from sysctl kern.memorystatus_vm_pressure_level (1=normal, 2=warning, 4=critical). Only emitted when the OS returns one of those known values.
+    unit: "1"
+    stability: development
+    gauge:
+      value_type: int
+
   system.memory.limit:
     enabled: false
     description: Total bytes of memory available.

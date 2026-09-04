@@ -48,6 +48,26 @@ func (ms *SystemLinuxMemoryDirtyMetricConfig) Unmarshal(parser *confmap.Conf) er
 	return nil
 }
 
+// SystemMemoryDarwinPressureMetricConfig provides config for the system.memory.darwin.pressure metric.
+type SystemMemoryDarwinPressureMetricConfig struct {
+	Enabled          bool `mapstructure:"enabled"`
+	enabledSetByUser bool
+}
+
+func (ms *SystemMemoryDarwinPressureMetricConfig) Unmarshal(parser *confmap.Conf) error {
+	if parser == nil {
+		return nil
+	}
+
+	err := parser.Unmarshal(ms)
+	if err != nil {
+		return err
+	}
+
+	ms.enabledSetByUser = parser.IsSet("enabled")
+	return nil
+}
+
 // SystemMemoryLimitMetricConfig provides config for the system.memory.limit metric.
 type SystemMemoryLimitMetricConfig struct {
 	Enabled          bool `mapstructure:"enabled"`
@@ -384,6 +404,7 @@ func (ms *SystemMemoryUtilizationMetricConfig) Validate() error {
 type MetricsConfig struct {
 	SystemLinuxMemoryAvailable            SystemLinuxMemoryAvailableMetricConfig            `mapstructure:"system.linux.memory.available"`
 	SystemLinuxMemoryDirty                SystemLinuxMemoryDirtyMetricConfig                `mapstructure:"system.linux.memory.dirty"`
+	SystemMemoryDarwinPressure            SystemMemoryDarwinPressureMetricConfig            `mapstructure:"system.memory.darwin.pressure"`
 	SystemMemoryLimit                     SystemMemoryLimitMetricConfig                     `mapstructure:"system.memory.limit"`
 	SystemMemoryLinuxHugepagesLimit       SystemMemoryLinuxHugepagesLimitMetricConfig       `mapstructure:"system.memory.linux.hugepages.limit"`
 	SystemMemoryLinuxHugepagesPageSize    SystemMemoryLinuxHugepagesPageSizeMetricConfig    `mapstructure:"system.memory.linux.hugepages.page_size"`
@@ -403,6 +424,9 @@ func DefaultMetricsConfig() MetricsConfig {
 			Enabled: false,
 		},
 		SystemLinuxMemoryDirty: SystemLinuxMemoryDirtyMetricConfig{
+			Enabled: false,
+		},
+		SystemMemoryDarwinPressure: SystemMemoryDarwinPressureMetricConfig{
 			Enabled: false,
 		},
 		SystemMemoryLimit: SystemMemoryLimitMetricConfig{

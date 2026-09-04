@@ -32,8 +32,9 @@ type memoryScraper struct {
 	mb       *metadata.MetricsBuilder
 
 	// for mocking gopsutil mem.VirtualMemory
-	bootTime      func(context.Context) (uint64, error)
-	virtualMemory func(context.Context) (*mem.VirtualMemoryStat, error)
+	bootTime       func(context.Context) (uint64, error)
+	virtualMemory  func(context.Context) (*mem.VirtualMemoryStat, error)
+	memoryPressure func() (int64, error)
 
 	pageSize int64
 }
@@ -41,11 +42,12 @@ type memoryScraper struct {
 // newMemoryScraper creates a Memory Scraper
 func newMemoryScraper(_ context.Context, settings scraper.Settings, cfg *Config) *memoryScraper {
 	return &memoryScraper{
-		settings:      settings,
-		config:        cfg,
-		bootTime:      host.BootTimeWithContext,
-		virtualMemory: mem.VirtualMemoryWithContext,
-		pageSize:      int64(os.Getpagesize()),
+		settings:       settings,
+		config:         cfg,
+		bootTime:       host.BootTimeWithContext,
+		virtualMemory:  mem.VirtualMemoryWithContext,
+		memoryPressure: readMemoryPressure,
+		pageSize:       int64(os.Getpagesize()),
 	}
 }
 
@@ -78,7 +80,9 @@ func (s *memoryScraper) scrape(ctx context.Context) (pmetric.Metrics, error) {
 		}
 		s.recordMemoryUtilizationMetric(now, memInfo)
 		s.recordMemoryLimitMetric(now, memInfo)
-		s.recordSystemSpecificMetrics(now, memInfo)
+		if err := s.recordSystemSpecificMetrics(now, memInfo); err != nil {
+			return s.mb.Emit(), scrapererror.NewPartialScrapeError(err, 1)
+		}
 		s.recordMemoryPageSizeMetric(now)
 	}
 

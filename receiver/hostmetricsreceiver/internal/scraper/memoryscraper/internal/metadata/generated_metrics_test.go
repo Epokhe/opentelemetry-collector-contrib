@@ -78,6 +78,9 @@ func TestMetricsBuilder(t *testing.T) {
 			mb.RecordSystemLinuxMemoryDirtyDataPoint(ts, 1)
 
 			allMetricsCount++
+			mb.RecordSystemMemoryDarwinPressureDataPoint(ts, 1)
+
+			allMetricsCount++
 			mb.RecordSystemMemoryLimitDataPoint(ts, 1)
 
 			allMetricsCount++
@@ -180,6 +183,18 @@ func TestMetricsBuilder(t *testing.T) {
 					assert.False(t, mi.Sum().IsMonotonic())
 					assert.Equal(t, pmetric.AggregationTemporalityCumulative, mi.Sum().AggregationTemporality())
 					dp := mi.Sum().DataPoints().At(0)
+					assert.Equal(t, start, dp.StartTimestamp())
+					assert.Equal(t, ts, dp.Timestamp())
+					assert.Equal(t, pmetric.NumberDataPointValueTypeInt, dp.ValueType())
+					assert.Equal(t, int64(1), dp.IntValue())
+				case "system.memory.darwin.pressure":
+					assert.False(t, validatedMetrics["system.memory.darwin.pressure"], "Found a duplicate in the metrics slice: system.memory.darwin.pressure")
+					validatedMetrics["system.memory.darwin.pressure"] = true
+					assert.Equal(t, pmetric.MetricTypeGauge, mi.Type())
+					assert.Equal(t, 1, mi.Gauge().DataPoints().Len())
+					assert.Equal(t, "macOS kernel memory pressure level from sysctl kern.memorystatus_vm_pressure_level (1=normal, 2=warning, 4=critical). Only emitted when the OS returns one of those known values.", mi.Description())
+					assert.Equal(t, "1", mi.Unit())
+					dp := mi.Gauge().DataPoints().At(0)
 					assert.Equal(t, start, dp.StartTimestamp())
 					assert.Equal(t, ts, dp.Timestamp())
 					assert.Equal(t, pmetric.NumberDataPointValueTypeInt, dp.ValueType())

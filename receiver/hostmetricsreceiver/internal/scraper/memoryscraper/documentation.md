@@ -52,6 +52,14 @@ The amount of dirty memory according to `/proc/meminfo`.
 | ---- | ----------- | ---------- | ----------------------- | --------- | --------- |
 | By | Sum | Int | Cumulative | false | Development |
 
+### system.memory.darwin.pressure
+
+macOS kernel memory pressure level from sysctl kern.memorystatus_vm_pressure_level (1=normal, 2=warning, 4=critical). Only emitted when the OS returns one of those known values.
+
+| Unit | Metric Type | Value Type | Stability |
+| ---- | ----------- | ---------- | --------- |
+| 1 | Gauge | Int | Development |
+
 ### system.memory.limit
 
 Total bytes of memory available.

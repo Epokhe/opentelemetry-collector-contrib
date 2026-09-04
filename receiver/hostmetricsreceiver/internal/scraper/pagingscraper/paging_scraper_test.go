@@ -76,6 +76,14 @@ func TestScrape(t *testing.T) {
 			md, err := scraper.scrape(t.Context())
 			require.NoError(t, err)
 			metrics := md.ResourceMetrics().At(0).ScopeMetrics().At(0).Metrics()
+			if runtime.GOOS == "darwin" {
+				assert.Equal(t, 2, md.MetricCount())
+				assert.Equal(t, "system.paging.usage", metrics.At(0).Name())
+				assert.Equal(t, "system.paging.utilization", metrics.At(1).Name())
+				assertPagingUsageMetricValid(t, metrics.At(0))
+				assertPagingUtilizationMetricValid(t, metrics.At(1))
+				return
+			}
 
 			expectedMetrics := 4
 			assert.Equal(t, expectedMetrics, md.MetricCount())
@@ -133,7 +141,7 @@ func assertPagingUsageMetricValid(t *testing.T, hostPagingUsageMetric pmetric.Me
 	// expect at least used, free & cached datapoint
 	expectedDataPoints := 3
 	// windows does not return a cached datapoint
-	if runtime.GOOS == "windows" || runtime.GOOS == "linux" {
+	if runtime.GOOS == "windows" || runtime.GOOS == "linux" || runtime.GOOS == "darwin" {
 		expectedDataPoints = 2
 	}
 
@@ -143,13 +151,13 @@ func assertPagingUsageMetricValid(t *testing.T, hostPagingUsageMetric pmetric.Me
 	internal.AssertSumMetricHasAttributeValue(t, hostPagingUsageMetric, 1, "state",
 		pcommon.NewValueStr(metadata.AttributeStateFree.String()))
 	// Windows and Linux do not support cached state label
-	if runtime.GOOS != "windows" && runtime.GOOS != "linux" {
+	if runtime.GOOS != "windows" && runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
 		internal.AssertSumMetricHasAttributeValue(t, hostPagingUsageMetric, 2, "state",
 			pcommon.NewValueStr(metadata.AttributeStateCached.String()))
 	}
 
 	// on Windows and Linux, also expect the page file device name label
-	if runtime.GOOS == "windows" || runtime.GOOS == "linux" {
+	if runtime.GOOS == "windows" || runtime.GOOS == "linux" || runtime.GOOS == "darwin" {
 		internal.AssertSumMetricHasAttribute(t, hostPagingUsageMetric, 0, "device")
 		internal.AssertSumMetricHasAttribute(t, hostPagingUsageMetric, 1, "device")
 	}
@@ -171,7 +179,7 @@ func assertPagingUtilizationMetricValid(t *testing.T, hostPagingUtilizationMetri
 	// expect at least used, free & cached datapoint
 	expectedDataPoints := 3
 	// Windows does not return a cached datapoint
-	if runtime.GOOS == "windows" || runtime.GOOS == "linux" {
+	if runtime.GOOS == "windows" || runtime.GOOS == "linux" || runtime.GOOS == "darwin" {
 		expectedDataPoints = 2
 	}
 
@@ -181,13 +189,13 @@ func assertPagingUtilizationMetricValid(t *testing.T, hostPagingUtilizationMetri
 	internal.AssertGaugeMetricHasAttributeValue(t, hostPagingUtilizationMetric, 1, "state",
 		pcommon.NewValueStr(metadata.AttributeStateFree.String()))
 	// Windows and Linux do not support cached state label
-	if runtime.GOOS != "windows" && runtime.GOOS != "linux" {
+	if runtime.GOOS != "windows" && runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
 		internal.AssertGaugeMetricHasAttributeValue(t, hostPagingUtilizationMetric, 2, "state",
 			pcommon.NewValueStr(metadata.AttributeStateCached.String()))
 	}
 
 	// on Windows and Linux, also expect the page file device name label
-	if runtime.GOOS == "windows" || runtime.GOOS == "linux" {
+	if runtime.GOOS == "windows" || runtime.GOOS == "linux" || runtime.GOOS == "darwin" {
 		internal.AssertGaugeMetricHasAttribute(t, hostPagingUtilizationMetric, 0, "device")
 		internal.AssertGaugeMetricHasAttribute(t, hostPagingUtilizationMetric, 1, "device")
 	}

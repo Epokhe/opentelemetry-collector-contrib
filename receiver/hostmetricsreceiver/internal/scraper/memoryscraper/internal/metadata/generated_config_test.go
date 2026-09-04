@@ -32,6 +32,9 @@ func TestMetricsBuilderConfig(t *testing.T) {
 					SystemLinuxMemoryDirty: SystemLinuxMemoryDirtyMetricConfig{
 						Enabled: true,
 					},
+					SystemMemoryDarwinPressure: SystemMemoryDarwinPressureMetricConfig{
+						Enabled: true,
+					},
 					SystemMemoryLimit: SystemMemoryLimitMetricConfig{
 						Enabled: true,
 					},
@@ -86,6 +89,9 @@ func TestMetricsBuilderConfig(t *testing.T) {
 					SystemLinuxMemoryDirty: SystemLinuxMemoryDirtyMetricConfig{
 						Enabled: false,
 					},
+					SystemMemoryDarwinPressure: SystemMemoryDarwinPressureMetricConfig{
+						Enabled: false,
+					},
 					SystemMemoryLimit: SystemMemoryLimitMetricConfig{
 						Enabled: false,
 					},
@@ -134,7 +140,7 @@ func TestMetricsBuilderConfig(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := loadMetricsBuilderConfig(t, tt.name)
-			diff := cmp.Diff(tt.want, cfg, cmpopts.IgnoreUnexported(SystemLinuxMemoryAvailableMetricConfig{}, SystemLinuxMemoryDirtyMetricConfig{}, SystemMemoryLimitMetricConfig{}, SystemMemoryLinuxHugepagesLimitMetricConfig{}, SystemMemoryLinuxHugepagesPageSizeMetricConfig{}, SystemMemoryLinuxHugepagesReservedMetricConfig{}, SystemMemoryLinuxHugepagesSurplusMetricConfig{}, SystemMemoryLinuxHugepagesUsageMetricConfig{}, SystemMemoryLinuxHugepagesUtilizationMetricConfig{}, SystemMemoryLinuxSharedMetricConfig{}, SystemMemoryPageSizeMetricConfig{}, SystemMemoryUsageMetricConfig{}, SystemMemoryUtilizationMetricConfig{}))
+			diff := cmp.Diff(tt.want, cfg, cmpopts.IgnoreUnexported(SystemLinuxMemoryAvailableMetricConfig{}, SystemLinuxMemoryDirtyMetricConfig{}, SystemMemoryDarwinPressureMetricConfig{}, SystemMemoryLimitMetricConfig{}, SystemMemoryLinuxHugepagesLimitMetricConfig{}, SystemMemoryLinuxHugepagesPageSizeMetricConfig{}, SystemMemoryLinuxHugepagesReservedMetricConfig{}, SystemMemoryLinuxHugepagesSurplusMetricConfig{}, SystemMemoryLinuxHugepagesUsageMetricConfig{}, SystemMemoryLinuxHugepagesUtilizationMetricConfig{}, SystemMemoryLinuxSharedMetricConfig{}, SystemMemoryPageSizeMetricConfig{}, SystemMemoryUsageMetricConfig{}, SystemMemoryUtilizationMetricConfig{}))
 			require.Emptyf(t, diff, "Config mismatch (-expected +actual):\n%s", diff)
 		})
 	}

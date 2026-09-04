@@ -5,6 +5,8 @@ all_set:
       enabled: true
     system.linux.memory.dirty:
       enabled: true
+    system.memory.darwin.pressure:
+      enabled: true
     system.memory.limit:
       enabled: true
     system.memory.linux.hugepages.limit:
@@ -37,6 +39,8 @@ reaggregate_set:
       enabled: true
     system.linux.memory.dirty:
       enabled: true
+    system.memory.darwin.pressure:
+      enabled: true
     system.memory.limit:
       enabled: true
     system.memory.linux.hugepages.limit:
@@ -68,6 +72,8 @@ none_set:
     system.linux.memory.available:
       enabled: false
     system.linux.memory.dirty:
+      enabled: false
+    system.memory.darwin.pressure:
       enabled: false
     system.memory.limit:
       enabled: false
