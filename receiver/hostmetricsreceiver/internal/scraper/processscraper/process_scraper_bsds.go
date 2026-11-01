@@ -28,6 +28,11 @@ func (s *processScraper) recordCPUUtilization(now pcommon.Timestamp, cpuUtilizat
 	s.mb.RecordProcessCPUUtilizationDataPoint(now, cpuUtilization.Iowait, metadata.AttributeStateWait, metadata.AttributeCPUModeIowait)
 }
 
+// The process name does not derive from the executable here, and reading the
+// executable costs a kern.procargs2 sysctl, so it is read only for
+// process.executable.path.
+const readExecutableWhenPathDisabled = false
+
 func getProcessName(ctx context.Context, proc processHandle, _ string) (string, error) {
 	name, err := proc.NameWithContext(ctx)
 	if err != nil {

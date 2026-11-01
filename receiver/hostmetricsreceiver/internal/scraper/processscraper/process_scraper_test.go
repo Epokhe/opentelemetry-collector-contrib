@@ -1353,6 +1353,47 @@ func TestScrapeMetrics_CommandReaderOnlyRunsForEnabledCommandAttributes(t *testi
 	}
 }
 
+func TestScrapeMetrics_OwnerReaderOnlyRunsForEnabledOwnerAttribute(t *testing.T) {
+	skipTestOnUnsupportedOS(t)
+
+	for _, test := range []struct {
+		name      string
+		owner     bool
+		wantCalls int
+	}{
+		{name: "owner disabled", wantCalls: 0},
+		{name: "owner enabled", owner: true, wantCalls: 1},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			metricsBuilderConfig := metadata.NewDefaultMetricsBuilderConfig()
+			metricsBuilderConfig.ResourceAttributes.ProcessOwner.Enabled = test.owner
+
+			scraper, err := newProcessScraper(scrapertest.NewNopSettings(metadata.Type), &Config{MetricsBuilderConfig: metricsBuilderConfig})
+			require.NoError(t, err)
+			require.NoError(t, scraper.start(t.Context(), componenttest.NewNopHost()))
+
+			handleMock := &processHandleMock{}
+			handleMock.On("NameWithContext", mock.Anything).Return("test", nil)
+			handleMock.On("ExeWithContext", mock.Anything).Return("test", nil)
+			handleMock.On("CreateTimeWithContext", mock.Anything).Return(time.Now().UnixMilli(), nil)
+			initDefaultsHandleMock(t, handleMock)
+			scraper.getProcessHandles = func(context.Context) (processHandles, error) {
+				return &processHandlesMock{handles: []*processHandleMock{handleMock}}, nil
+			}
+
+			md, err := scraper.scrape(t.Context())
+			require.NoError(t, err)
+			handleMock.AssertNumberOfCalls(t, "UsernameWithContext", test.wantCalls)
+
+			owner, ok := md.ResourceMetrics().At(0).Resource().Attributes().Get("process.owner")
+			assert.Equal(t, test.owner, ok)
+			if test.owner {
+				assert.Equal(t, "username", owner.Str())
+			}
+		})
+	}
+}
+
 func TestScrapeMetrics_CpuUtilizationWhenCpuTimesIsDisabled(t *testing.T) {
 	skipTestOnUnsupportedOS(t)
 

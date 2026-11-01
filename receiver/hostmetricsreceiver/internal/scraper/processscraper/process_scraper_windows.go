@@ -28,6 +28,9 @@ func (s *processScraper) recordCPUUtilization(now pcommon.Timestamp, cpuUtilizat
 	s.mb.RecordProcessCPUUtilizationDataPoint(now, cpuUtilization.System, metadata.AttributeStateSystem, metadata.AttributeCPUModeSystem)
 }
 
+// The process name derives from the executable path.
+const readExecutableWhenPathDisabled = true
+
 func getProcessName(_ context.Context, _ processHandle, exePath string) (string, error) {
 	if exePath == "" {
 		return "", errors.New("executable path is empty")

@@ -27,6 +27,9 @@ func (s *processScraper) recordCPUUtilization(now pcommon.Timestamp, cpuUtilizat
 	s.mb.RecordProcessCPUUtilizationDataPoint(now, cpuUtilization.Iowait, metadata.AttributeStateWait, metadata.AttributeCPUModeIowait)
 }
 
+// Upstream behaviour: the executable is read even when its attribute is disabled.
+const readExecutableWhenPathDisabled = true
+
 func getProcessName(ctx context.Context, proc processHandle, _ string) (string, error) {
 	name, err := proc.NameWithContext(ctx)
 	if err != nil {

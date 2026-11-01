@@ -214,10 +214,13 @@ func (s *processScraper) getProcessMetadata(ctx context.Context) ([]*processMeta
 		pid := handles.Pid(i)
 		handle := handles.At(i)
 
-		exe, err := getProcessExecutable(ctx, handle)
-		if err != nil {
-			if !s.config.MuteProcessExeError {
-				errs.AddPartial(1, fmt.Errorf("error reading process executable for pid %v: %w", pid, err))
+		var exe string
+		if readExecutableWhenPathDisabled || s.config.MetricsBuilderConfig.ResourceAttributes.ProcessExecutablePath.Enabled {
+			exe, err = getProcessExecutable(ctx, handle)
+			if err != nil {
+				if !s.config.MuteProcessExeError {
+					errs.AddPartial(1, fmt.Errorf("error reading process executable for pid %v: %w", pid, err))
+				}
 			}
 		}
 
@@ -252,10 +255,13 @@ func (s *processScraper) getProcessMetadata(ctx context.Context) ([]*processMeta
 			}
 		}
 
-		username, err := handle.UsernameWithContext(ctx)
-		if err != nil {
-			if !s.config.MuteProcessUserError {
-				errs.AddPartial(0, fmt.Errorf("error reading username for process %q (pid %v): %w", executable.name, pid, err))
+		var username string
+		if s.config.MetricsBuilderConfig.ResourceAttributes.ProcessOwner.Enabled {
+			username, err = handle.UsernameWithContext(ctx)
+			if err != nil {
+				if !s.config.MuteProcessUserError {
+					errs.AddPartial(0, fmt.Errorf("error reading username for process %q (pid %v): %w", executable.name, pid, err))
+				}
 			}
 		}
 
