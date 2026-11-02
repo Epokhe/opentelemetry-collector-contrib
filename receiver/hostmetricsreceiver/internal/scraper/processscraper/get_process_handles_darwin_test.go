@@ -6,6 +6,7 @@
 package processscraper
 
 import (
+	"context"
 	"errors"
 	"os"
 	"testing"
@@ -13,7 +14,12 @@ import (
 	"github.com/shirou/gopsutil/v4/process"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/collector/component/componenttest"
+	"go.opentelemetry.io/collector/scraper/scrapererror"
+	"go.opentelemetry.io/collector/scraper/scrapertest"
 	"golang.org/x/sys/unix"
+
+	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver/internal/scraper/processscraper/internal/metadata"
 )
 
 // The handles serve name, start time and parent pid from the process list;
@@ -74,4 +80,90 @@ func TestGetGopsutilProcessHandles_SkipsKernelTask(t *testing.T) {
 	for i := 0; i < handles.Len(); i++ {
 		assert.Positive(t, handles.Pid(i))
 	}
+}
+
+// Task info is read while listing, so gopsutil's later read of the same
+// process sees at least as much CPU time.
+func TestGetGopsutilProcessHandles_TaskInfoMatchesGopsutil(t *testing.T) {
+	handles, err := getGopsutilProcessHandles(t.Context())
+	require.NoError(t, err)
+
+	for i := 0; i < handles.Len(); i++ {
+		if handles.Pid(i) != int32(os.Getpid()) {
+			continue
+		}
+		times, err := handles.At(i).TimesWithContext(t.Context())
+		require.NoError(t, err)
+		memory, err := handles.At(i).MemoryInfoWithContext(t.Context())
+		require.NoError(t, err)
+
+		want, err := process.NewProcessWithContext(t.Context(), handles.Pid(i))
+		require.NoError(t, err)
+		wantTimes, err := want.TimesWithContext(t.Context())
+		require.NoError(t, err)
+		wantMemory, err := want.MemoryInfoWithContext(t.Context())
+		require.NoError(t, err)
+
+		assert.Positive(t, times.User+times.System)
+		assert.LessOrEqual(t, times.User+times.System, wantTimes.User+wantTimes.System)
+		assert.InDelta(t, wantTimes.User+wantTimes.System, times.User+times.System, 1)
+		assert.Positive(t, memory.RSS)
+		assert.InEpsilon(t, wantMemory.RSS, memory.RSS, 0.5)
+		return
+	}
+	t.Fatal("the test process is not listed")
+}
+
+// A process macOS refuses (EPERM) or no longer has (ESRCH) is not listed;
+// as a non-root user, that is every process of another effective uid.
+func TestGetGopsutilProcessHandles_SkipsUnreadableTaskInfo(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root reads every process")
+	}
+	handles, err := getGopsutilProcessHandles(t.Context())
+	require.NoError(t, err)
+
+	listed := make(map[int32]bool, handles.Len())
+	for i := 0; i < handles.Len(); i++ {
+		listed[handles.Pid(i)] = true
+		handle := handles.At(i).(*darwinProcessHandle)
+		assert.False(t, errors.Is(handle.taskInfoErr, unix.EPERM) || errors.Is(handle.taskInfoErr, unix.ESRCH),
+			"pid %d listed with %v", handles.Pid(i), handle.taskInfoErr)
+	}
+	assert.False(t, listed[1], "launchd, owned by root, is listed")
+}
+
+// Any other task info failure is a scrape error, and the process emits no
+// metrics.
+func TestScrapeMetrics_TaskInfoFailureIsReportedAndEmitsNothing(t *testing.T) {
+	metricsBuilderConfig := metadata.NewDefaultMetricsBuilderConfig()
+	scraper, err := newProcessScraper(scrapertest.NewNopSettings(metadata.Type), &Config{MetricsBuilderConfig: metricsBuilderConfig})
+	require.NoError(t, err)
+	require.NoError(t, scraper.start(t.Context(), componenttest.NewNopHost()))
+
+	readable := darwinProcessHandle{
+		wrappedProcessHandle: wrappedProcessHandle{Process: &process.Process{Pid: 10}},
+		comm:                 "readable",
+		taskInfo:             process.ProcTaskInfo{Total_user: 3e9, Resident_size: 4096},
+		timescale:            1,
+	}
+	failing := darwinProcessHandle{
+		wrappedProcessHandle: wrappedProcessHandle{Process: &process.Process{Pid: 11}},
+		comm:                 "failing",
+		taskInfoErr:          unix.EIO,
+	}
+	scraper.getProcessHandles = func(context.Context) (processHandles, error) {
+		return &darwinProcessHandles{handles: []darwinProcessHandle{readable, failing}}, nil
+	}
+
+	md, err := scraper.scrape(t.Context())
+	var partial scrapererror.PartialScrapeError
+	require.ErrorAs(t, err, &partial)
+	assert.ErrorContains(t, err, `error reading cpu times for process "failing" (pid 11): input/output error`)
+	assert.ErrorContains(t, err, `error reading memory info for process "failing" (pid 11): input/output error`)
+
+	require.Equal(t, 1, md.ResourceMetrics().Len())
+	pid, ok := md.ResourceMetrics().At(0).Resource().Attributes().Get("process.pid")
+	require.True(t, ok)
+	assert.Equal(t, int64(10), pid.Int())
 }
